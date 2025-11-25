@@ -41,9 +41,16 @@ const SettingsView: React.FC<{
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
         } else {
-            const { error } = await supabase.auth.signUp({ email, password });
+            // Fix: Force redirect to current origin (works for localhost AND vercel)
+            const { error } = await supabase.auth.signUp({ 
+                email, 
+                password,
+                options: {
+                    emailRedirectTo: window.location.origin
+                }
+            });
             if (error) throw error;
-            alert("Compte créé ! Vérifiez vos emails si nécessaire.");
+            alert("Compte créé ! Vérifiez vos emails pour confirmer votre inscription.");
         }
         setEmail('');
         setPassword('');
@@ -890,10 +897,47 @@ const App: React.FC = () => {
 
         if (data) {
             // Merge: Cloud overrides local if present
-            if (data.plans) setPlans(data.plans);
-            if (data.logs) setLogs(data.logs);
+            // Logic: we want to keep ALL unique logs.
+            // For plans, we trust the cloud one unless local has unsynced changes (complex, so let's merge unique IDs)
+            
+            // MERGE LOGS
+            const cloudLogs = (data.logs || []) as WorkoutLog[];
+            const localLogs = logs;
+            const mergedLogs = [...cloudLogs];
+            
+            localLogs.forEach(lLog => {
+                if (!mergedLogs.some(cLog => cLog.id === lLog.id)) {
+                    mergedLogs.push(lLog);
+                }
+            });
+
+            // MERGE PLANS
+            const cloudPlans = (data.plans || []) as DayPlan[];
+            const localPlans = plans;
+            const mergedPlans = [...cloudPlans];
+             localPlans.forEach(lPlan => {
+                if (!mergedPlans.some(cPlan => cPlan.id === lPlan.id)) {
+                    mergedPlans.push(lPlan);
+                }
+            });
+
+            console.log("Sync Merged:", { mergedPlans, mergedLogs });
+
+            setPlans(mergedPlans);
+            setLogs(mergedLogs);
+
+            // Push merged back to cloud to ensure consistency
+            if (mergedLogs.length > cloudLogs.length || mergedPlans.length > cloudPlans.length) {
+                 await supabase.from('user_data').upsert({ 
+                    id: user.id, 
+                    plans: mergedPlans, 
+                    logs: mergedLogs,
+                    updated_at: new Date()
+                });
+            }
+
         } else if (error && error.code === 'PGRST116') {
-            // Row missing, create it
+            // Row missing, create it with local data
              await supabase.from('user_data').upsert({ 
                 id: user.id, 
                 plans: plans, 
@@ -910,6 +954,8 @@ const App: React.FC = () => {
         { event: 'UPDATE', schema: 'public', table: 'user_data', filter: `id=eq.${user.id}` },
         (payload: any) => {
             const newData = payload.new;
+            // Only update if we didn't just trigger it (optimistic UI is hard here without granular IDs)
+            // For now, accept cloud truth
             if (newData.plans) setPlans(newData.plans);
             if (newData.logs) setLogs(newData.logs);
         }
@@ -919,12 +965,13 @@ const App: React.FC = () => {
     return () => {
         supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user]); // We don't depend on logs/plans here to avoid infinite loops, we trigger saves separately
 
   // 4. Persistence (Local + Cloud push)
   useEffect(() => {
     localStorage.setItem('companion_plans', JSON.stringify(plans));
     if (user && supabase) {
+        // Debounce could be added here for performance
         supabase.from('user_data').upsert({ id: user.id, plans: plans, updated_at: new Date() }).then(({ error }: any) => {
            if(error) console.error("Sync error plans:", error);
         });
@@ -953,8 +1000,9 @@ const App: React.FC = () => {
 
   const handleClearData = () => {
     if(window.confirm("Êtes-vous sûr de vouloir supprimer tous les programmes importés ?\n\nCette action supprimera tous les exercices du stockage local et du cloud (si connecté), mais ne touchera PAS à votre historique d'entraînement.")) {
-        setPlans([]);
-        setActivePlan(null);
+        setActivePlan(null); // Ensure no active session is using a deleted plan
+        setPlans([]); // This triggers the useEffect that syncs to localStorage and Cloud
+        alert("Programmes supprimés.");
     }
   };
 
