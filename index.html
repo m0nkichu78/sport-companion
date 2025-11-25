@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Companion</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              te: {
+                orange: '#FF5800',
+                base: '#EFEBE2', // Crème warm
+                dark: '#2D3238',
+                grey: '#A3B1C6',
+                lightgrey: '#EFEBE2',
+                dim: '#8A8680' // Warmer grey for text
+              }
+            },
+            fontFamily: {
+              sans: ['DM Mono', 'monospace'],
+              mono: ['DM Mono', 'monospace'],
+            },
+            boxShadow: {
+              // Warm shadows for Cream background
+              // Dark shadow: #CDCAC2 (approx rgb(205, 202, 194))
+              // Light shadow: #FFFFFF
+              'neu-out': '9px 9px 16px rgb(205, 202, 194), -9px -9px 16px rgba(255,255,255, 0.8)',
+              'neu-out-sm': '5px 5px 10px rgb(205, 202, 194), -5px -5px 10px rgba(255,255,255, 0.8)',
+              'neu-pressed': 'inset 6px 6px 10px rgb(205, 202, 194), inset -6px -6px 10px rgba(255,255,255, 0.8)',
+              'neu-pressed-sm': 'inset 3px 3px 6px rgb(205, 202, 194), inset -3px -3px 6px rgba(255,255,255, 0.8)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #EFEBE2;
+        color: #2D3238;
+        font-family: 'DM Mono', monospace;
+        -webkit-font-smoothing: antialiased;
+      }
+      /* Material Symbols Sharp Base Style */
+      .material-symbols-sharp {
+        font-variation-settings:
+        'FILL' 1,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24;
+        display: inline-block;
+        line-height: 1;
+        /* Ensure it inherits color */
+        color: inherit; 
+      }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #CDCAC2;
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #FF5800;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
