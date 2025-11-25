@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ViewState, DayPlan, WorkoutLog, Exercise, SetPerformance } from './types';
-import { TEButton, TECard, TEInput, TEValueDisplay, TEIcon } from './components/TEComponents';
+import { TEButton, TECard, TEInput, TEValueDisplay, TEIcon, TENumberInput } from './components/TEComponents';
 import { parseCSV, SAMPLE_CSV } from './services/parser';
 import { Timer } from './components/Timer';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -46,9 +46,6 @@ const SettingsView: React.FC<{
     if (!userGoal.trim()) return;
     
     // SAFE API KEY ACCESS FOR VERCEL/VITE
-    // Vercel/Vite uses import.meta.env.VITE_API_KEY
-    // Node uses process.env.API_KEY
-    // We try to access safely to avoid "process is not defined" crash in browser
     let apiKey = '';
     try {
         // @ts-ignore
@@ -300,8 +297,8 @@ const WorkoutSessionView: React.FC<{
   useEffect(() => {
     const initialData: { [key: number]: SetPerformance[] } = {};
     plan.exercises.forEach((ex, idx) => {
-        let defaultWeight = 0;
-        let defaultReps = 0;
+        let defaultWeight = 8; // User Default: 8kg
+        let defaultReps = 10; // User Default: 10 reps
         let defaultCadence = undefined;
 
         if (ex.mode === 'bike') {
@@ -314,8 +311,10 @@ const WorkoutSessionView: React.FC<{
         } else {
             // Standard
             const weightMatch = ex.description?.match(/(\d+)kg/i);
-            defaultWeight = weightMatch ? parseFloat(weightMatch[1]) : 0;
-            defaultReps = isNaN(parseInt(ex.reps)) ? 0 : parseInt(ex.reps);
+            if (weightMatch) defaultWeight = parseFloat(weightMatch[1]);
+            
+            const parsedReps = parseInt(ex.reps);
+            if (!isNaN(parsedReps)) defaultReps = parsedReps;
         }
 
       initialData[idx] = Array.from({ length: ex.sets }).map((_, i) => ({
@@ -472,30 +471,24 @@ const WorkoutSessionView: React.FC<{
                                 {/* BIKE WARMUP DASHBOARD */}
                                 {exercise.category === 'warmup' && (
                                     <div className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[10px] uppercase text-te-dim font-mono flex items-center gap-1"><TEIcon.Timer size={10}/> Durée</label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="number"
-                                                        value={sets[0]?.reps || 0}
-                                                        onChange={(e) => updateSet(exIdx, 0, 'reps', parseFloat(e.target.value))}
-                                                        className="w-full bg-te-base shadow-neu-pressed rounded-xl py-4 text-center text-2xl font-bold text-te-dark outline-none focus:text-te-orange"
-                                                    />
-                                                    <span className="absolute bottom-2 right-4 text-[10px] text-te-dim">MIN</span>
-                                                </div>
+                                                <TENumberInput
+                                                    value={sets[0]?.reps || 0}
+                                                    onChange={(val) => updateSet(exIdx, 0, 'reps', val)}
+                                                    label="MIN"
+                                                    size="lg"
+                                                />
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[10px] uppercase text-te-dim font-mono flex items-center gap-1"><TEIcon.Gauge size={10}/> Cadence</label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="number"
-                                                        value={sets[0]?.cadence || 0}
-                                                        onChange={(e) => updateSet(exIdx, 0, 'cadence', parseFloat(e.target.value))}
-                                                        className="w-full bg-te-base shadow-neu-pressed rounded-xl py-4 text-center text-2xl font-bold text-te-dark outline-none focus:text-te-orange"
-                                                    />
-                                                    <span className="absolute bottom-2 right-4 text-[10px] text-te-dim">RPM</span>
-                                                </div>
+                                                <TENumberInput
+                                                    value={sets[0]?.cadence || 0}
+                                                    onChange={(val) => updateSet(exIdx, 0, 'cadence', val)}
+                                                    label="RPM"
+                                                    size="lg"
+                                                />
                                             </div>
                                         </div>
                                         <TEButton className="w-full py-4 text-lg" onClick={() => completeSet(exIdx, 0)}>
@@ -507,62 +500,46 @@ const WorkoutSessionView: React.FC<{
                                 {/* BIKE INTERVALS/MAIN SESSION - SINGLE CARD 4 INPUTS */}
                                 {exercise.category === 'strength' && (
                                     <div className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                             {/* Speed */}
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[10px] uppercase text-te-dim font-mono flex items-center gap-1"><TEIcon.Speed size={10}/> Vitesse</label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="number" 
-                                                        value={sets[0]?.speed || ''}
-                                                        onChange={(e) => updateSet(exIdx, 0, 'speed', parseFloat(e.target.value))}
-                                                        className="w-full bg-te-base shadow-neu-pressed rounded-xl py-3 text-center text-xl font-bold text-te-dark outline-none focus:text-te-orange"
-                                                        placeholder="0"
-                                                    />
-                                                    <span className="absolute bottom-1 right-3 text-[8px] text-te-dim">KM/H</span>
-                                                </div>
+                                                <TENumberInput
+                                                    value={sets[0]?.speed || 0}
+                                                    onChange={(val) => updateSet(exIdx, 0, 'speed', val)}
+                                                    label="KM/H"
+                                                    size="lg"
+                                                />
                                             </div>
                                             {/* Distance */}
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[10px] uppercase text-te-dim font-mono flex items-center gap-1"><TEIcon.MapPin size={10}/> Distance</label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="number" 
-                                                        value={sets[0]?.distance || ''}
-                                                        onChange={(e) => updateSet(exIdx, 0, 'distance', parseFloat(e.target.value))}
-                                                        className="w-full bg-te-base shadow-neu-pressed rounded-xl py-3 text-center text-xl font-bold text-te-dark outline-none focus:text-te-orange"
-                                                        placeholder="0"
-                                                    />
-                                                    <span className="absolute bottom-1 right-3 text-[8px] text-te-dim">KM</span>
-                                                </div>
+                                                <TENumberInput
+                                                    value={sets[0]?.distance || 0}
+                                                    onChange={(val) => updateSet(exIdx, 0, 'distance', val)}
+                                                    label="KM"
+                                                    size="lg"
+                                                />
                                             </div>
                                             {/* BPM */}
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[10px] uppercase text-te-dim font-mono flex items-center gap-1"><TEIcon.Heart size={10}/> BPM</label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="number" 
-                                                        value={sets[0]?.heartRate || ''}
-                                                        onChange={(e) => updateSet(exIdx, 0, 'heartRate', parseFloat(e.target.value))}
-                                                        className="w-full bg-te-base shadow-neu-pressed rounded-xl py-3 text-center text-xl font-bold text-te-dark outline-none focus:text-te-orange"
-                                                        placeholder="0"
-                                                    />
-                                                    <span className="absolute bottom-1 right-3 text-[8px] text-te-dim">BPM</span>
-                                                </div>
+                                                <TENumberInput
+                                                    value={sets[0]?.heartRate || 0}
+                                                    onChange={(val) => updateSet(exIdx, 0, 'heartRate', val)}
+                                                    label="BPM"
+                                                    size="lg"
+                                                />
                                             </div>
                                             {/* RPM */}
                                             <div className="flex flex-col gap-2">
                                                 <label className="text-[10px] uppercase text-te-dim font-mono flex items-center gap-1"><TEIcon.Gauge size={10}/> RPM</label>
-                                                <div className="relative">
-                                                    <input 
-                                                        type="number" 
-                                                        value={sets[0]?.cadence || ''}
-                                                        onChange={(e) => updateSet(exIdx, 0, 'cadence', parseFloat(e.target.value))}
-                                                        className="w-full bg-te-base shadow-neu-pressed rounded-xl py-3 text-center text-xl font-bold text-te-dark outline-none focus:text-te-orange"
-                                                        placeholder="0"
-                                                    />
-                                                    <span className="absolute bottom-1 right-3 text-[8px] text-te-dim">RPM</span>
-                                                </div>
+                                                <TENumberInput
+                                                    value={sets[0]?.cadence || 0}
+                                                    onChange={(val) => updateSet(exIdx, 0, 'cadence', val)}
+                                                    label="RPM"
+                                                    size="lg"
+                                                />
                                             </div>
                                         </div>
 
@@ -630,49 +607,43 @@ const WorkoutSessionView: React.FC<{
                                     return (
                                         <div 
                                             key={setIdx} 
-                                            className={`relative grid grid-cols-[auto_1fr_1fr_auto] gap-3 items-center p-3 rounded-xl transition-all duration-300 ${
+                                            className={`relative grid grid-cols-[auto_1fr_1fr_auto] gap-1.5 sm:gap-2 items-center p-2 rounded-xl transition-all duration-300 ${
                                                 isSetEnabled && !isSetCompleted 
                                                 ? 'bg-te-base shadow-neu-pressed border-l-4 border-l-te-orange' 
                                                 : 'bg-transparent border border-transparent'
                                             } ${!isSetEnabled ? 'opacity-40 grayscale pointer-events-none' : ''}`}
                                         >
                                             {/* Label */}
-                                            <div className="font-mono text-[10px] uppercase text-te-dim w-12">
-                                                {`Série ${set.setNumber}`}
+                                            <div className="font-mono text-[10px] uppercase text-te-dim w-6 text-center">
+                                                S{set.setNumber}
                                             </div>
 
                                             {/* Inputs */}
                                             {/* Input 1: Weight */}
-                                            <div className="relative">
-                                                <input 
-                                                    type="number" 
-                                                    value={set.weight}
-                                                    disabled={!isSetEnabled || isSetCompleted}
-                                                    onChange={(e) => updateSet(exIdx, setIdx, 'weight', parseFloat(e.target.value))}
-                                                    className={`w-full bg-transparent text-center font-mono text-lg font-bold text-te-dark outline-none ${isSetCompleted ? 'text-te-dim' : ''}`}
-                                                    placeholder="0"
-                                                />
-                                                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[8px] text-te-dim pointer-events-none">KG</span>
-                                            </div>
+                                            <TENumberInput
+                                                value={set.weight}
+                                                onChange={(val) => updateSet(exIdx, setIdx, 'weight', val)}
+                                                label="KG"
+                                                disabled={!isSetEnabled || isSetCompleted}
+                                                className={isSetCompleted ? 'opacity-50' : ''}
+                                                size="sm"
+                                            />
 
                                             {/* Input 2: Reps */}
-                                            <div className="relative">
-                                                <input 
-                                                    type="number" 
-                                                    value={set.reps}
-                                                    disabled={!isSetEnabled || isSetCompleted}
-                                                    onChange={(e) => updateSet(exIdx, setIdx, 'reps', parseFloat(e.target.value))}
-                                                    className={`w-full bg-transparent text-center font-mono text-lg font-bold text-te-dark outline-none ${isSetCompleted ? 'text-te-dim' : ''}`}
-                                                    placeholder="0"
-                                                />
-                                                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[8px] text-te-dim pointer-events-none">REP</span>
-                                            </div>
+                                            <TENumberInput
+                                                value={set.reps}
+                                                onChange={(val) => updateSet(exIdx, setIdx, 'reps', val)}
+                                                label="REP"
+                                                disabled={!isSetEnabled || isSetCompleted}
+                                                className={isSetCompleted ? 'opacity-50' : ''}
+                                                size="sm"
+                                            />
 
                                             {/* Checkbox / Action */}
                                             <button 
                                                 onClick={() => !isSetCompleted && completeSet(exIdx, setIdx)}
                                                 disabled={!isSetEnabled || isSetCompleted}
-                                                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+                                                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
                                                     isSetCompleted 
                                                     ? 'bg-te-orange text-white shadow-neu-pressed-sm' 
                                                     : 'bg-te-base shadow-neu-out text-te-dim hover:text-te-orange active:shadow-neu-pressed'
@@ -839,7 +810,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-te-base text-te-dark font-sans selection:bg-te-orange selection:text-white max-w-2xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.05)] relative">
       
-      <main className="p-6 min-h-screen box-border">
+      <main className="p-4 sm:p-6 min-h-screen box-border">
         {renderContent()}
       </main>
 

@@ -37,12 +37,12 @@ export const TECard: React.FC<CardProps> = ({ children, className = '', title, a
   return (
     <div className={`bg-te-base shadow-neu-out rounded-2xl border border-white/40 ${className}`}>
       {(title || action) && (
-        <div className="px-6 py-4 flex justify-between items-center mb-2">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center mb-2">
           {title && <h3 className="font-mono text-[10px] uppercase font-bold text-te-dim tracking-[0.2em]">{title}</h3>}
           {action && <div>{action}</div>}
         </div>
       )}
-      <div className={`px-6 pb-6 ${!title && !action ? 'pt-6' : ''}`}>
+      <div className={`px-4 pb-4 sm:px-6 sm:pb-6 ${!title && !action ? 'pt-4 sm:pt-6' : ''}`}>
         {children}
       </div>
     </div>
@@ -119,6 +119,7 @@ export const TEIcon = {
 
   // Actions
   Plus: (props: IconProps) => <MaterialIcon name="add" {...props} />,
+  Minus: (props: IconProps) => <MaterialIcon name="remove" {...props} />,
   Check: (props: IconProps) => <MaterialIcon name="check" {...props} />,
   Back: (props: IconProps) => <MaterialIcon name="arrow_back" {...props} />,
   Upload: (props: IconProps) => <MaterialIcon name="upload_file" {...props} />,
@@ -141,4 +142,71 @@ export const TEIcon = {
   Heart: (props: IconProps) => <MaterialIcon name="favorite" {...props} />,
   MapPin: (props: IconProps) => <MaterialIcon name="location_on" {...props} />,
   Speed: (props: IconProps) => <MaterialIcon name="speed" {...props} />
+};
+
+// --- TE Number Input ---
+interface NumberInputProps {
+  value: number;
+  onChange: (val: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  label?: string; // unit label like KG
+  className?: string;
+  disabled?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export const TENumberInput: React.FC<NumberInputProps> = ({ 
+  value, 
+  onChange, 
+  min = 0, 
+  max, 
+  step = 1, 
+  label, 
+  className = '',
+  disabled,
+  size = 'md'
+}) => {
+  const inc = () => !disabled && onChange(Math.min(max ?? Infinity, value + step));
+  const dec = () => !disabled && onChange(Math.max(min ?? -Infinity, value - step));
+  
+  // Sizing Logic
+  const btnClass = size === 'lg' ? 'w-12 h-12 rounded-xl' : size === 'sm' ? 'w-7 h-7 rounded-md' : 'w-8 h-8 rounded-md';
+  const iconSize = size === 'lg' ? 20 : 14;
+  const textSize = size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-sm' : 'text-lg';
+  const py = size === 'lg' ? 'py-2' : 'py-1';
+
+  return (
+    <div className={`flex items-center gap-1 ${className} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+      <button 
+        onClick={dec}
+        className={`${btnClass} bg-te-base shadow-neu-out-sm flex items-center justify-center text-te-dim active:shadow-neu-pressed-sm active:scale-95 touch-manipulation transition-all flex-shrink-0`}
+        type="button"
+      >
+        <TEIcon.Minus size={iconSize} />
+      </button>
+      
+      <div className="flex-1 relative min-w-0">
+        <input 
+          type="number"
+          inputMode="decimal"
+          pattern="[0-9]*"
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className={`w-full bg-transparent text-center font-mono ${textSize} ${py} font-bold text-te-dark outline-none p-0 min-w-0`}
+          disabled={disabled}
+        />
+        {label && <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] text-te-dim pointer-events-none whitespace-nowrap">{label}</span>}
+      </div>
+
+      <button 
+        onClick={inc}
+        className={`${btnClass} bg-te-base shadow-neu-out-sm flex items-center justify-center text-te-dim active:shadow-neu-pressed-sm active:scale-95 touch-manipulation transition-all flex-shrink-0`}
+        type="button"
+      >
+        <TEIcon.Plus size={iconSize} />
+      </button>
+    </div>
+  );
 };
