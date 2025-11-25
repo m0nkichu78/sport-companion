@@ -45,9 +45,34 @@ const SettingsView: React.FC<{
   const generateWithAI = async () => {
     if (!userGoal.trim()) return;
     
+    // SAFE API KEY ACCESS FOR VERCEL/VITE
+    // Vercel/Vite uses import.meta.env.VITE_API_KEY
+    // Node uses process.env.API_KEY
+    // We try to access safely to avoid "process is not defined" crash in browser
+    let apiKey = '';
+    try {
+        // @ts-ignore
+        if (import.meta && import.meta.env && import.meta.env.VITE_API_KEY) {
+            // @ts-ignore
+            apiKey = import.meta.env.VITE_API_KEY;
+        } else if (process.env.API_KEY) {
+            apiKey = process.env.API_KEY;
+        }
+    } catch (e) {
+        console.warn("Could not read env vars directly, checking process...");
+        if (typeof process !== 'undefined' && process.env) {
+            apiKey = process.env.API_KEY || '';
+        }
+    }
+
+    if (!apiKey) {
+        alert("Clé API manquante. Veuillez configurer VITE_API_KEY sur Vercel.");
+        return;
+    }
+
     setIsGenerating(true);
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: apiKey });
         const csvStructure = `Type,Durée,Echauffement,Exercices échauffement,Exercice 1,Série Ex 1,Exercice 2,Série Ex 2,Exercice 3,Série Ex 3,Exercice 4,Série Ex 4,Exercice 5,Série Ex 5,Exercice 6,Série Ex 6,Abdominaux`;
         
         const prompt = `
