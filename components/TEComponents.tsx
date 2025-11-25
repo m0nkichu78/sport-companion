@@ -124,6 +124,10 @@ export const TEIcon = {
   Back: (props: IconProps) => <MaterialIcon name="arrow_back" {...props} />,
   Upload: (props: IconProps) => <MaterialIcon name="upload_file" {...props} />,
   Magic: (props: IconProps) => <MaterialIcon name="auto_awesome" {...props} />,
+  Cloud: (props: IconProps) => <MaterialIcon name="cloud" {...props} />,
+  CloudOff: (props: IconProps) => <MaterialIcon name="cloud_off" {...props} />,
+  User: (props: IconProps) => <MaterialIcon name="person" {...props} />,
+  Logout: (props: IconProps) => <MaterialIcon name="logout" {...props} />,
   
   // Player / Timer
   Play: (props: IconProps) => <MaterialIcon name="play_arrow" {...props} />,

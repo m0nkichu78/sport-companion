@@ -5,6 +5,7 @@ import { parseCSV, SAMPLE_CSV } from './services/parser';
 import { Timer } from './components/Timer';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { GoogleGenAI } from "@google/genai";
+import { supabase, isSupabaseReady } from './services/supabase';
 
 // --- Sub-components for cleaner App.tsx ---
 
@@ -12,12 +13,51 @@ import { GoogleGenAI } from "@google/genai";
 const SettingsView: React.FC<{ 
   onImport: (data: DayPlan[]) => void, 
   onClear: () => void,
-  hasData: boolean 
-}> = ({ onImport, onClear, hasData }) => {
+  hasData: boolean,
+  user: any | null
+}> = ({ onImport, onClear, hasData, user }) => {
   const [csvContent, setCsvContent] = useState('');
   const [showAiModal, setShowAiModal] = useState(false);
   const [userGoal, setUserGoal] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Auth States
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLogin, setIsLogin] = useState(true);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) {
+        setAuthError("Service Cloud indisponible (Clés manquantes)");
+        return;
+    }
+    setAuthError('');
+    setAuthLoading(true);
+    try {
+        if (isLogin) {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+        } else {
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) throw error;
+            alert("Compte créé ! Vérifiez vos emails si nécessaire.");
+        }
+        setEmail('');
+        setPassword('');
+    } catch (err: any) {
+        console.error(err);
+        setAuthError(err.message || "Erreur d'authentification");
+    } finally {
+        setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+      if(supabase) await supabase.auth.signOut();
+  };
   
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -159,6 +199,69 @@ const SettingsView: React.FC<{
             </div>
         </div>
       )}
+
+      {/* CLOUD SYNC CARD */}
+      <TECard title="Supabase Sync" action={user ? <span className="text-te-orange"><TEIcon.Cloud size={20}/></span> : <TEIcon.CloudOff size={20} className="text-te-dim"/>}>
+         {!isSupabaseReady() ? (
+            <div className="text-center p-4">
+                <p className="text-xs text-te-dim mb-2 font-mono">Service Cloud non configuré.</p>
+                <p className="text-[10px] text-red-500">Ajoutez les clés API Supabase dans Vercel.</p>
+            </div>
+         ) : user ? (
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3 bg-te-base shadow-neu-pressed p-3 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-te-orange text-white flex items-center justify-center">
+                        <TEIcon.User size={20} />
+                    </div>
+                    <div className="overflow-hidden">
+                        <p className="text-[10px] uppercase text-te-dim">Connecté en tant que</p>
+                        <p className="text-sm font-bold truncate">{user.email}</p>
+                    </div>
+                </div>
+                <div className="text-[10px] text-te-dim text-center px-4">
+                    Vos données sont synchronisées automatiquement entre vos appareils.
+                </div>
+                <TEButton variant="secondary" onClick={handleLogout} className="w-full">
+                    <span className="flex items-center gap-2"><TEIcon.Logout size={16}/> Déconnexion</span>
+                </TEButton>
+            </div>
+         ) : (
+            <form onSubmit={handleAuth} className="space-y-4">
+                {authError && <div className="text-[10px] text-red-500 bg-red-100 p-2 rounded-lg text-center">{authError}</div>}
+                
+                <TEInput 
+                    type="email" 
+                    placeholder="Email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    required 
+                    label="COMPTE"
+                />
+                <TEInput 
+                    type="password" 
+                    placeholder="Mot de passe" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    required 
+                    label="SECURITÉ"
+                />
+                
+                <TEButton type="submit" disabled={authLoading} className="w-full">
+                    {authLoading ? '...' : (isLogin ? 'Se connecter' : 'Créer un compte')}
+                </TEButton>
+                
+                <div className="text-center">
+                    <button 
+                        type="button" 
+                        onClick={() => setIsLogin(!isLogin)} 
+                        className="text-[10px] uppercase text-te-dim underline decoration-dotted hover:text-te-orange"
+                    >
+                        {isLogin ? "Pas de compte ? S'inscrire" : "Déjà un compte ? Se connecter"}
+                    </button>
+                </div>
+            </form>
+         )}
+      </TECard>
 
       <TECard title="Import de Données">
         <div className="space-y-6">
@@ -747,7 +850,9 @@ const App: React.FC = () => {
   const [plans, setPlans] = useState<DayPlan[]>([]);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [activePlan, setActivePlan] = useState<DayPlan | null>(null);
+  const [user, setUser] = useState<any | null>(null);
 
+  // 1. Initial Load from LocalStorage
   useEffect(() => {
     const savedPlans = localStorage.getItem('companion_plans');
     const savedLogs = localStorage.getItem('companion_logs');
@@ -755,13 +860,85 @@ const App: React.FC = () => {
     if (savedLogs) setLogs(JSON.parse(savedLogs));
   }, []);
 
+  // 2. Auth State Observer (Supabase)
+  useEffect(() => {
+    if (!supabase) return;
+    
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
+        setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+        setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 3. Cloud Sync (Download & Listen)
+  useEffect(() => {
+    if (!user || !supabase) return;
+
+    // A. FETCH INITIAL DATA
+    const fetchData = async () => {
+        const { data, error } = await supabase
+            .from('user_data')
+            .select('plans, logs')
+            .eq('id', user.id)
+            .single();
+
+        if (data) {
+            // Merge: Cloud overrides local if present
+            if (data.plans) setPlans(data.plans);
+            if (data.logs) setLogs(data.logs);
+        } else if (error && error.code === 'PGRST116') {
+            // Row missing, create it
+             await supabase.from('user_data').upsert({ 
+                id: user.id, 
+                plans: plans, 
+                logs: logs 
+            });
+        }
+    };
+    fetchData();
+
+    // B. SUBSCRIBE TO REALTIME CHANGES
+    const channel = supabase.channel('custom-all-channel')
+    .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'user_data', filter: `id=eq.${user.id}` },
+        (payload: any) => {
+            const newData = payload.new;
+            if (newData.plans) setPlans(newData.plans);
+            if (newData.logs) setLogs(newData.logs);
+        }
+    )
+    .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // 4. Persistence (Local + Cloud push)
   useEffect(() => {
     localStorage.setItem('companion_plans', JSON.stringify(plans));
-  }, [plans]);
+    if (user && supabase) {
+        supabase.from('user_data').upsert({ id: user.id, plans: plans, updated_at: new Date() }).then(({ error }: any) => {
+           if(error) console.error("Sync error plans:", error);
+        });
+    }
+  }, [plans, user]);
 
   useEffect(() => {
     localStorage.setItem('companion_logs', JSON.stringify(logs));
-  }, [logs]);
+    if (user && supabase) {
+        supabase.from('user_data').upsert({ id: user.id, logs: logs, updated_at: new Date() }).then(({ error }: any) => {
+            if(error) console.error("Sync error logs:", error);
+         });
+    }
+  }, [logs, user]);
 
   const handleStartWorkout = (plan: DayPlan) => {
     setActivePlan(plan);
@@ -775,7 +952,7 @@ const App: React.FC = () => {
   };
 
   const handleClearData = () => {
-    if(window.confirm("Êtes-vous sûr de vouloir supprimer tous les programmes importés ?\n\nCette action supprimera tous les exercices du stockage local mais ne touchera PAS à votre historique d'entraînement.")) {
+    if(window.confirm("Êtes-vous sûr de vouloir supprimer tous les programmes importés ?\n\nCette action supprimera tous les exercices du stockage local et du cloud (si connecté), mais ne touchera PAS à votre historique d'entraînement.")) {
         setPlans([]);
         setActivePlan(null);
     }
@@ -801,7 +978,7 @@ const App: React.FC = () => {
       case ViewState.STATS:
         return <StatsView logs={logs} />;
       case ViewState.SETTINGS:
-        return <SettingsView onImport={setPlans} onClear={handleClearData} hasData={plans.length > 0} />;
+        return <SettingsView onImport={setPlans} onClear={handleClearData} hasData={plans.length > 0} user={user} />;
       default:
         return <HomeView plans={plans} onStart={handleStartWorkout} />;
     }
@@ -840,6 +1017,7 @@ const App: React.FC = () => {
             className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === ViewState.SETTINGS ? 'text-te-orange scale-110' : 'hover:text-white'}`}
           >
             <TEIcon.Settings size={22} />
+            {user && <div className="absolute top-3 right-8 w-2 h-2 rounded-full bg-green-500 border border-te-dark"></div>}
           </button>
         </nav>
       )}
